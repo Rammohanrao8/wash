@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wash-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: laundry
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Rammohanrao@41
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d laundry']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wash-backend
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      DATABASE_URL: postgresql://postgres:Rammohanrao%4041@postgres:5432/laundry?schema=public
+      NODE_ENV: production
+      PORT: 5000
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

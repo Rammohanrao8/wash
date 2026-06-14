@@ -1,16 +1,33 @@
 import React from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { ShoppingBag, MapPin, User, Star, Compass, History } from 'lucide-react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { ShoppingBag, MapPin, User, Compass, History, LogOut, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/useCartStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { ModeToggle } from '@/components/ModeToggle';
 
 export const MainLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const items = useCartStore((state) => state.items);
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
+  const { user, isAuthenticated, logout } = useAuthStore();
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const getDashboardPath = () => {
+    if (!user) return '/login';
+    if (user.role === 'CUSTOMER') return '/orders';
+    if (user.role === 'SHOP_OWNER') return '/dashboard/shop';
+    if (user.role === 'DELIVERY_PARTNER') return '/dashboard/delivery';
+    if (user.role === 'ADMIN') return '/dashboard/admin';
+    return '/';
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 flex flex-col">
@@ -28,25 +45,43 @@ export const MainLayout: React.FC = () => {
           </div>
 
           <nav className="hidden md:flex items-center gap-6">
-            <Link to="/shops" className={`text-sm font-medium transition ${isActive('/shops') ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'}`}>Explore</Link>
-            <Link to="/orders" className={`text-sm font-medium transition ${isActive('/orders') ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'}`}>Track Orders</Link>
+            <Link to="/shops" className={`text-sm font-medium transition ${isActive('/shops') ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>Explore</Link>
+            {user?.role === 'CUSTOMER' && (
+              <Link to="/orders" className={`text-sm font-medium transition ${isActive('/orders') ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>Orders</Link>
+            )}
             <ModeToggle />
-            <Link to="/cart">
-              <Button variant="outline" className="relative gap-2 border-slate-200 dark:border-slate-800">
-                <ShoppingBag className="h-4 w-4" />
-                <span>Cart</span>
-                {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold animate-pulse">
-                    {cartCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
-            <Link to="/dashboard">
-              <Button size="icon" variant="ghost" className="rounded-full">
-                <User className="h-5 w-5" />
-              </Button>
-            </Link>
+            
+            {user?.role === 'CUSTOMER' && (
+              <Link to="/checkout">
+                <Button variant="outline" className="relative gap-2 border-slate-200 dark:border-slate-800">
+                  <ShoppingBag className="h-4 w-4" />
+                  <span>Cart</span>
+                  {cartCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold animate-pulse">
+                      {cartCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+            )}
+
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Link to={getDashboardPath()}>
+                  <Button variant="outline" className="gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button variant="ghost" onClick={handleLogout} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Link to="/login">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">Sign in</Button>
+              </Link>
+            )}
           </nav>
         </div>
       </header>
@@ -62,22 +97,26 @@ export const MainLayout: React.FC = () => {
           <Compass className="h-5 w-5" />
           <span className="text-[10px] font-medium">Explore</span>
         </Link>
-        <Link to="/orders" className={`flex flex-col items-center gap-1 p-2 transition ${isActive('/orders') ? 'text-blue-600' : 'text-slate-400'}`}>
-          <History className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Orders</span>
-        </Link>
-        <Link to="/cart" className={`relative flex flex-col items-center gap-1 p-2 transition ${isActive('/cart') ? 'text-blue-600' : 'text-slate-400'}`}>
-          <ShoppingBag className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Cart</span>
-          {cartCount > 0 && (
-            <span className="absolute top-1 right-2 bg-blue-600 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
-              {cartCount}
-            </span>
-          )}
-        </Link>
-        <Link to="/dashboard" className={`flex flex-col items-center gap-1 p-2 transition ${isActive('/dashboard') ? 'text-blue-600' : 'text-slate-400'}`}>
-          <User className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Profile</span>
+        {user?.role === 'CUSTOMER' && (
+          <Link to="/orders" className={`flex flex-col items-center gap-1 p-2 transition ${isActive('/orders') ? 'text-blue-600' : 'text-slate-400'}`}>
+            <History className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Orders</span>
+          </Link>
+        )}
+        {user?.role === 'CUSTOMER' && (
+          <Link to="/checkout" className={`relative flex flex-col items-center gap-1 p-2 transition ${isActive('/checkout') ? 'text-blue-600' : 'text-slate-400'}`}>
+            <ShoppingBag className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Cart</span>
+            {cartCount > 0 && (
+              <span className="absolute top-1 right-2 bg-blue-600 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {cartCount}
+              </span>
+            )}
+          </Link>
+        )}
+        <Link to={getDashboardPath()} className={`flex flex-col items-center gap-1 p-2 transition ${location.pathname.includes('/dashboard') ? 'text-blue-600' : 'text-slate-400'}`}>
+          {isAuthenticated ? <LayoutDashboard className="h-5 w-5" /> : <User className="h-5 w-5" />}
+          <span className="text-[10px] font-medium">{isAuthenticated ? 'Dashboard' : 'Sign in'}</span>
         </Link>
       </nav>
     </div>

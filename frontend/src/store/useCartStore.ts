@@ -1,67 +1,83 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { ShopService } from '@/services/shopService';
 
-export interface CartItem {
-  id: string;
-  name: string;
-  category: string; // e.g., 'Washing', 'Ironing'
-  price: number;
+export interface CartItem extends ShopService {
   quantity: number;
 }
 
 interface CartState {
   shopId: string | null;
-  shopName: string | null;
   items: CartItem[];
-  addItem: (shopId: string, shopName: string, item: Omit<CartItem, 'quantity'>) => void;
-  removeItem: (itemId: string) => void;
-  updateQuantity: (itemId: string, quantity: number) => void;
+  
+  addItem: (shopId: string, service: ShopService) => void;
+  removeItem: (serviceId: string) => void;
+  updateQuantity: (serviceId: string, quantity: number) => void;
   clearCart: () => void;
-  getCartTotal: () => number;
+  
+  getTotalAmount: () => number;
 }
 
-export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      shopId: null,
-      shopName: null,
-      items: [],
-      addItem: (shopId, shopName, item) => set((state) => {
-        // If ordering from a different shop, reset the cart for safety
-        const isNewShop = state.shopId !== shopId;
-        const currentItems = isNewShop ? [] : [...state.items];
-        
-        const existingItemIndex = currentItems.findIndex((i) => i.id === item.id);
-        if (existingItemIndex > -1) {
-          currentItems[existingItemIndex].quantity += 1;
-        } else {
-          currentItems.push({ ...item, quantity: 1 });
-        }
-        return { shopId, shopName, items: currentItems };
-      }),
-      removeItem: (itemId) => set((state) => {
-        const updatedItems = state.items.filter((item) => item.id !== itemId);
-        if (updatedItems.length === 0) {
-          return { shopId: null, shopName: null, items: [] };
-        }
-        return { items: updatedItems };
-      }),
-      updateQuantity: (itemId, quantity) => set((state) => {
-        if (quantity <= 0) {
-          const updatedItems = state.items.filter((item) => item.id !== itemId);
-          return updatedItems.length === 0 
-            ? { shopId: null, shopName: null, items: [] } 
-            : { items: updatedItems };
-        }
-        return {
-          items: state.items.map((item) => item.id === itemId ? { ...item, quantity } : item)
-        };
-      }),
-      clearCart: () => set({ shopId: null, shopName: null, items: [] }),
-      getCartTotal: () => {
-        return get().items.reduce((acc, item) => acc + item.price * item.quantity, 0);
+export const useCartStore = create<CartState>((set, get) => ({
+  shopId: null,
+  items: [],
+  
+  addItem: (shopId, service) => {
+    const state = get();
+    
+    // If adding an item from a different shop, clear the cart first
+    if (state.shopId && state.shopId !== shopId) {
+      if (!window.confirm('Adding items from a different shop will clear your current cart. Continue?')) {
+        return;
       }
-    }),
-    { name: 'laundro-cart-storage' }
-  )
-);
+      set({ shopId, items: [{ ...service, quantity: 1 }] });
+      return;
+    }
+    
+    const existingItem = state.items.find(item => item.id === service.id);
+    
+    if (existingItem) {
+      set({
+        items: state.items.map(item => 
+          item.id === service.id 
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      });
+    } else {
+      set({
+        shopId,
+        items: [...state.items, { ...service, quantity: 1 }]
+      });
+    }
+  },
+  
+  removeItem: (serviceId) => {
+    const state = get();
+    const newItems = state.items.filter(item => item.id !== serviceId);
+    
+    set({
+      items: newItems,
+      shopId: newItems.length === 0 ? null : state.shopId
+    });
+  },
+  
+  updateQuantity: (serviceId, quantity) => {
+    if (quantity <= 0) {
+      get().removeItem(serviceId);
+      return;
+    }
+    
+    set((state) => ({
+      items: state.items.map(item => 
+        item.id === serviceId ? { ...item, quantity } : item
+      )
+    }));
+  },
+  
+  clearCart: () => set({ shopId: null, items: [] }),
+  
+  getTotalAmount: () => {
+    const state = get();
+    return state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+  }
+}));

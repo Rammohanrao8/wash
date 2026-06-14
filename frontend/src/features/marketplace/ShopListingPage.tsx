@@ -1,160 +1,168 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, SlidersHorizontal, Star, Clock, MapPin, Sparkles } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-
-// Decoupled Static Dummy Data Structure representing multi-service shops
-const SHOPS_DATA = [
-  {
-    id: '1',
-    name: 'Sparkle Premium Dry Cleaners',
-    rating: 4.8,
-    reviewsCount: 120,
-    distance: '1.2 km',
-    deliveryTime: '24-48 hrs',
-    startingPrice: 49,
-    services: ['Dry Cleaning', 'Premium Care', 'Ironing'],
-    image: 'https://images.unsplash.com/photo-1545173168-9f1947e8b943?auto=format&fit=crop&w=600&q=80',
-    featured: true,
-  },
-  {
-    id: '2',
-    name: 'Express Wash & Fold',
-    rating: 4.5,
-    reviewsCount: 84,
-    distance: '2.5 km',
-    deliveryTime: '12-24 hrs',
-    startingPrice: 19,
-    services: ['Washing', 'Ironing'],
-    image: 'https://images.unsplash.com/photo-1517677208171-0bc6725a3e60?auto=format&fit=crop&w=600&q=80',
-    featured: false,
-  },
-];
+import { useQuery } from '@tanstack/react-query';
+import { shopService } from '@/services/shopService';
+import { MapPin, Star, Search, Filter, Compass } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export const ShopListingPage: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const categories = ['All', 'Washing', 'Ironing', 'Dry Cleaning', 'Premium Care'];
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['shops', searchTerm],
+    queryFn: () => shopService.getShops({ search: searchTerm }),
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Premium Discovery Banner */}
-      <div className="relative rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 p-6 md:p-10 text-white overflow-hidden shadow-xl">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1610557892470-55d9e80c0bce?auto=format&fit=crop&w=1200&q=80')] mix-blend-overlay opacity-10 bg-cover bg-center" />
-        <div className="relative max-w-2xl space-y-4">
-          <Badge className="bg-white/20 text-white backdrop-blur-md border-none gap-1 py-1 px-3">
-            <Sparkles className="h-3.5 w-3.5 fill-white" /> Free pickup on orders above ₹299
-          </Badge>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">
-            Expert clothing care, <br />delivered to your doorstep.
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Header Section */}
+      <section className="relative rounded-3xl overflow-hidden bg-blue-600 text-white p-8 md:p-12 shadow-xl">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-800 opacity-90"></div>
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1545173168-9f1947eebb7f?auto=format&fit=crop&q=80')] opacity-20 bg-cover bg-center mix-blend-overlay"></div>
+        
+        <div className="relative z-10 max-w-2xl space-y-4">
+          <span className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full bg-white/20 backdrop-blur-md text-sm font-medium border border-white/10 shadow-sm">
+            <Compass className="h-4 w-4" />
+            Discover Local Services
+          </span>
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white leading-tight">
+            Premium Laundry,<br />Delivered to You.
           </h1>
+          <p className="text-blue-100 text-lg md:text-xl max-w-lg leading-relaxed">
+            Find the best-rated laundry shops in your area with real-time tracking and professional care.
+          </p>
         </div>
-      </div>
+      </section>
 
-      {/* Floating Interactive Controls Container */}
-      <div className="sticky top-16 z-40 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md py-4 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-slate-200/40 dark:border-slate-800/40">
+      {/* Search and Filters Section */}
+      <section className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white dark:bg-slate-900 p-2 md:p-4 rounded-2xl shadow-sm border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-xl">
         <div className="relative w-full md:max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-slate-400" />
+          </div>
           <input
             type="text"
-            placeholder="Search for clothes cleaners or services..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition"
+            className="block w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+            placeholder="Search by shop name or location..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-
-        {/* Dynamic Category Scrollbar */}
-        <div className="w-full md:w-auto flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-          <Button variant="outline" size="sm" className="gap-2 shrink-0 rounded-xl border-slate-200 dark:border-slate-800">
-            <SlidersHorizontal className="h-4 w-4" /> Filters
-          </Button>
-          {categories.map((category) => (
-            <Button
-              key={category}
-              variant={activeCategory === category ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveCategory(category)}
-              className="rounded-xl shrink-0 border-slate-200 dark:border-slate-800 font-medium transition-all"
-            >
-              {category}
-            </Button>
-          ))}
+        
+        <div className="flex w-full md:w-auto gap-2">
+          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-sm">
+            <Filter className="h-4 w-4" />
+            Filters
+          </button>
+          <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button className="px-4 py-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm text-sm font-medium text-slate-900 dark:text-white">All</button>
+            <button className="px-4 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">Top Rated</button>
+            <button className="px-4 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">Nearest</button>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Optimized Grid Layout */}
-      <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <AnimatePresence mode="popLayout">
-          {SHOPS_DATA.map((shop) => (
-            <motion.div
-              key={shop.id}
-              layout
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Link to={`/shops/${shop.id}`}>
-                <Card className="group overflow-hidden rounded-2xl border-slate-200/60 dark:border-slate-800/60 hover:shadow-xl transition-all duration-300 bg-white dark:bg-slate-900/40 backdrop-blur-sm cursor-pointer flex flex-col h-full">
-                  <div className="relative aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800">
-                    <img
-                      src={shop.image}
-                      alt={shop.name}
-                      className="w-full h-full object-cover transform group-hover:scale-105 transition duration-500"
-                      loading="lazy"
-                    />
-                    {shop.featured && (
-                      <Badge className="absolute top-3 left-3 bg-gradient-to-r from-amber-500 to-orange-500 border-none shadow-md">
-                        Top Rated
-                      </Badge>
-                    )}
-                    <div className="absolute bottom-3 right-3 bg-white/95 dark:bg-slate-900/95 px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1 backdrop-blur-sm">
-                      <Clock className="h-3.5 w-3.5 text-blue-500" /> {shop.deliveryTime}
+      {/* Grid List */}
+      <section>
+        <div className="flex items-center justify-between mb-6 px-1">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            Top Rated Shops
+            <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs py-1 px-2.5 rounded-full font-semibold">
+              {data?.data?.length || 0}
+            </span>
+          </h2>
+        </div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-white dark:bg-slate-900 overflow-hidden shadow-sm animate-pulse">
+                <div className="h-48 bg-slate-200 dark:bg-slate-800 w-full" />
+                <div className="p-5 space-y-4">
+                  <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded-md w-3/4" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-md w-1/2" />
+                  <div className="pt-4 flex justify-between items-center border-t border-slate-100 dark:border-slate-800">
+                    <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-16" />
+                    <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-full w-24" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-500">Failed to load shops. Please try again.</p>
+          </div>
+        ) : data?.data?.length === 0 ? (
+          <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white">No shops found</h3>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">Try adjusting your search criteria</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {data.data.map((shop: any, index: number) => (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.05 }}
+                key={shop.id}
+                className="group flex flex-col rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-white dark:bg-slate-900 overflow-hidden hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1 transition-all duration-300"
+              >
+                {/* Image Area */}
+                <div className="relative h-48 w-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <img
+                    src={`https://images.unsplash.com/photo-1517677208171-0bc6725a3e60?auto=format&fit=crop&q=80&w=800&ixlib=rb-4.0.3`}
+                    alt={shop.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent"></div>
+                  
+                  {/* Rating Badge */}
+                  <div className="absolute bottom-3 left-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-sm text-slate-900 dark:text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-sm font-bold border border-white/20">
+                    <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                    {shop.rating ? shop.rating.toFixed(1) : 'New'}
+                    <span className="text-slate-400 font-normal text-xs ml-0.5">({shop.totalReviews || 0})</span>
+                  </div>
+                </div>
+
+                {/* Content Area */}
+                <div className="flex-1 p-5 flex flex-col">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                      {shop.name}
+                    </h3>
+                    
+                    <div className="mt-2.5 flex items-start gap-1.5 text-slate-500 dark:text-slate-400">
+                      <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
+                      <p className="text-sm line-clamp-2 leading-relaxed">
+                        {shop.street}, {shop.city}
+                      </p>
                     </div>
                   </div>
 
-                  <CardContent className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-bold text-lg leading-tight group-hover:text-blue-600 transition tracking-tight">
-                          {shop.name}
-                        </h3>
-                        <div className="flex items-center gap-1 bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-lg text-xs font-bold shrink-0">
-                          <Star className="h-3.5 w-3.5 fill-current" /> {shop.rating}
+                  <div className="mt-5 pt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex -space-x-2">
+                      {/* Fake avatars for "recent customers" */}
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className={`w-7 h-7 rounded-full border-2 border-white dark:border-slate-900 bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden z-[${4-i}]`}>
+                          <img src={`https://i.pravatar.cc/100?img=${i + index * 3}`} alt="User" />
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
-                        <MapPin className="h-3.5 w-3.5" /> {shop.distance} Away
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {shop.services.map((srv) => (
-                        <Badge key={srv} variant="secondary" className="text-[10px] font-medium tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-none">
-                          {srv}
-                        </Badge>
                       ))}
                     </div>
-
-                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3 flex items-center justify-between mt-2">
-                      <span className="text-xs text-slate-400 font-medium">Starts from</span>
-                      <span className="text-base font-black text-slate-900 dark:text-white">
-                        ₹{shop.startingPrice}<span className="text-xs font-normal text-slate-400">/item</span>
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </motion.div>
+                    
+                    <Link
+                      to={`/shops/${shop.id}`}
+                      className="px-4 py-2 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white dark:bg-blue-500/10 dark:hover:bg-blue-600 dark:text-blue-400 dark:hover:text-white rounded-xl text-sm font-semibold transition-colors duration-300"
+                    >
+                      View Services
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

@@ -1,0 +1,328 @@
+// ─── Prisma Schema for Wash Laundry Marketplace ─────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  SHOP_OWNER
+  DELIVERY_PARTNER
+  ADMIN
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PICKUP_ASSIGNED
+  PICKED_UP
+  PROCESSING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum OtpType {
+  SIGNUP
+  LOGIN
+  RESET_PASSWORD
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  DELIVERY_UPDATE
+  PROMOTION
+  SYSTEM
+  WELCOME
+}
+
+enum VehicleType {
+  BICYCLE
+  MOTORCYCLE
+  CAR
+  VAN
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  name        String?
+  phone       String?
+  password    String?
+  role        Role     @default(CUSTOMER)
+  avatar      String?
+  isVerified  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  addresses       Address[]
+  orders          Order[]          @relation("CustomerOrders")
+  reviews         Review[]
+  notifications   Notification[]
+  refreshTokens   RefreshToken[]
+  ownedShops      LaundryShop[]    @relation("ShopOwner")
+  deliveryPartner DeliveryPartner?
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  type      OtpType
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, type])
+  @@index([expiresAt])
+  @@map("otps")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  label     String   @default("Home")
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  landmark  String?
+  latitude  Float?
+  longitude Float?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model LaundryShop {
+  id          String   @id @default(uuid())
+  ownerId     String
+  name        String
+  description String?
+  phone       String
+  email       String?
+  street      String
+  city        String
+  state       String
+  zipCode     String
+  latitude    Float?
+  longitude   Float?
+  isApproved  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  rating      Float    @default(0)
+  totalRatings Int     @default(0)
+  openTime    String   @default("08:00")
+  closeTime   String   @default("20:00")
+  coverImage  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner    User      @relation("ShopOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  services Service[]
+  orders   Order[]
+  reviews  Review[]
+
+  @@index([ownerId])
+  @@index([city])
+  @@index([isApproved, isActive])
+  @@map("laundry_shops")
+}
+
+model Service {
+  id                String   @id @default(uuid())
+  shopId            String
+  name              String
+  description       String?
+  price             Float
+  unit              String   @default("per_kg")
+  estimatedDuration Int      @default(24) // hours
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  shop       LaundryShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([shopId])
+  @@map("services")
+}
+
+model Order {
+  id                 String      @id @default(uuid())
+  orderNumber        String      @unique @default(uuid())
+  customerId         String
+  shopId             String
+  deliveryPartnerId  String?
+  status             OrderStatus @default(PLACED)
+  totalAmount        Float
+  pickupAddress      String
+  deliveryAddress    String
+  pickupScheduledAt  DateTime?
+  deliveryScheduledAt DateTime?
+  notes              String?
+  cancelReason       String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  // Relations
+  customer        User             @relation("CustomerOrders", fields: [customerId], references: [id])
+  shop            LaundryShop      @relation(fields: [shopId], references: [id])
+  deliveryPartner DeliveryPartner? @relation(fields: [deliveryPartnerId], references: [id])
+  items           OrderItem[]
+  payment         Payment?
+  reviews         Review[]
+
+  @@index([customerId])
+  @@index([shopId])
+  @@index([deliveryPartnerId])
+  @@index([status])
+  @@index([orderNumber])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  serviceId String
+  quantity  Float
+  price     Float
+  subtotal  Float
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String        @unique
+  method        PaymentMethod @default(COD)
+  status        PaymentStatus @default(PENDING)
+  amount        Float
+  transactionId String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("payments")
+}
+
+model DeliveryPartner {
+  id            String      @id @default(uuid())
+  userId        String      @unique
+  vehicleType   VehicleType @default(MOTORCYCLE)
+  vehicleNumber String?
+  licenseNumber String?
+  isAvailable   Boolean     @default(false)
+  isVerified    Boolean     @default(false)
+  currentLat    Float?
+  currentLng    Float?
+  totalEarnings Float       @default(0)
+  totalDeliveries Int       @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+  @@index([isAvailable, isVerified])
+  @@map("delivery_partners")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  shopId    String
+  orderId   String?
+  rating    Int      @default(5)
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop  LaundryShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  order Order?      @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, orderId])
+  @@index([shopId])
+  @@index([userId])
+  @@map("reviews")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(SYSTEM)
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}

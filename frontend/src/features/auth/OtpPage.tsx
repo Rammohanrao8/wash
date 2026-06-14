@@ -1,74 +1,136 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
+import { authService } from '@/services/authService';
+import { useAuthStore } from '@/store/useAuthStore';
+import { ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { ShieldAlert } from 'lucide-react';
 
 export const OtpPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const targetDestination = location.state?.destination || 'your profile address';
-  const [otp, setOtp] = useState(['', '', '', '']);
+  const { login } = useAuthStore();
+  
+  const email = location.state?.email;
+  const type = location.state?.type || 'SIGNUP'; // 'SIGNUP' | 'LOGIN'
 
-  const handleOtpInput = (index: number, val: string) => {
-    if (val.length > 1) return;
-    const computedOtp = [...otp];
-    computedOtp[index] = val;
-    setOtp(computedOtp);
+  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [error, setError] = useState('');
 
-    // Dynamic autofocus shift mechanics to speed up input
-    if (val && index < 3) {
-      const nextSibling = document.getElementById(`otp-node-${index + 1}`);
-      nextSibling?.focus();
+  // Redirect if no email in state
+  useEffect(() => {
+    if (!email) navigate('/login');
+  }, [email, navigate]);
+
+  const verifyMutation = useMutation({
+    mutationFn: type === 'LOGIN' 
+      ? (codeStr: string) => authService.verifyLoginOtp(email, codeStr)
+      : (codeStr: string) => authService.verifyOtp({ email, code: codeStr, type }),
+    onSuccess: (data) => {
+      // If the response contains tokens, log them in
+      if (data.data?.accessToken) {
+        login(data.data.user, data.data.accessToken, data.data.refreshToken);
+        const role = data.data.user.role;
+        if (role === 'CUSTOMER') navigate('/shops');
+        else if (role === 'SHOP_OWNER') navigate('/dashboard/shop');
+        else if (role === 'DELIVERY_PARTNER') navigate('/dashboard/delivery');
+        else if (role === 'ADMIN') navigate('/dashboard/admin');
+        else navigate('/');
+      } else {
+        // If just verification succeeded, navigate to login
+        navigate('/login', { state: { message: 'Verification successful. Please login.' } });
+      }
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.message || 'Invalid or expired OTP');
+    },
+  });
+
+  const handleChange = (index: number, value: string) => {
+    if (value.length > 1) return; // Prevent multiple chars
+    const newCode = [...code];
+    newCode[index] = value;
+    setCode(newCode);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
     }
   };
 
-  const verifySecurePayload = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otp.every(node => node !== '')) {
-      localStorage.setItem('accessToken', 'mock_jwt_session_token');
-      navigate('/shops');
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !code[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const codeStr = code.join('');
+    if (codeStr.length < 6) {
+      setError('Please enter the full 6-digit code');
+      return;
+    }
+    verifyMutation.mutate(codeStr);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md space-y-6 bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/60 dark:border-slate-800/60 shadow-xl"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 text-center"
       >
-        <div className="space-y-1.5 text-center">
-          <h2 className="text-xl font-extrabold tracking-tight">Security verification</h2>
-          <p className="text-xs text-slate-400 font-medium">We transmitted a 4-digit token parameters packet to <br /><span className="text-slate-900 dark:text-white font-bold">{targetDestination}</span></p>
+        <div className="flex justify-center">
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+            <ShieldCheck className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          </div>
+        </div>
+        
+        <div>
+          <h2 className="mt-4 text-2xl font-bold text-gray-900 dark:text-white">
+            Check your email
+          </h2>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            We've sent a 6-digit verification code to <br />
+            <span className="font-medium text-gray-900 dark:text-white">{email}</span>
+          </p>
         </div>
 
-        <form onSubmit={verifySecurePayload} className="space-y-6">
-          <div className="flex justify-center gap-3">
-            {otp.map((character, idx) => (
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/30 text-red-500 p-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+          
+          <div className="flex justify-center gap-2">
+            {code.map((digit, index) => (
               <input
-                key={idx}
-                id={`otp-node-${idx}`}
+                key={index}
+                id={`otp-${index}`}
                 type="text"
-                pattern="[0-9]*"
                 inputMode="numeric"
-                required
+                pattern="[0-9]*"
                 maxLength={1}
-                value={character}
-                onChange={(e) => handleOtpInput(idx, e.target.value)}
-                className="w-14 h-14 text-center text-xl font-black bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 dark:text-white transition-all"
+                value={digit}
+                onChange={(e) => handleChange(index, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(index, e)}
+                className="w-12 h-14 text-center text-2xl font-bold rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               />
             ))}
           </div>
 
-          <Button type="submit" className="w-full rounded-xl py-6 bg-slate-900 dark:bg-blue-600 font-bold hover:opacity-90 transition">
-            Authorize Credentials
-          </Button>
+          <button
+            type="submit"
+            disabled={verifyMutation.isPending || code.some(d => !d)}
+            className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors shadow-md"
+          >
+            {verifyMutation.isPending ? 'Verifying...' : 'Verify Code'}
+          </button>
         </form>
-
-        <p className="text-center text-xs font-semibold text-slate-400 hover:text-blue-500 cursor-pointer transition">
-          Didn't receive the token? Request transmission retry
-        </p>
       </motion.div>
     </div>
   );
